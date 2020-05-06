@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sws="http://www.springframework.org/schema/web-services"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:jee="http://www.springframework.org/schema/jee" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+       	http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+        http://www.springframework.org/schema/web-services 
+        http://www.springframework.org/schema/web-services/web-services-2.0.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context-3.0.xsd
+		http://www.springframework.org/schema/jee 
+		http://www.springframework.org/schema/jee/spring-jee-3.0.xsd
+        http://www.springframework.org/schema/tx 
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+
+	<context:annotation-config />
+
+	<sws:annotation-driven />
+
+	<context:component-scan base-package="com.tg.ws"></context:component-scan>
+
+	<bean id="entityManagerFactory"
+		class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+		<!--property name="dataSource" ref="subSystemDataSource" / -->
+		<property name="jpaVendorAdapter" ref="jpaAdapter" />
+		<property name="persistenceUnitName" value="qapprover" />
+	</bean>
+
+	<bean id="jpaAdapter"
+		class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter">
+		<property name="showSql" value="false" />
+		<property name="generateDdl" value="true" />
+		<property name="databasePlatform" value="org.hibernate.dialect.SQLServer2005Dialect" />
+	</bean>
+
+	<bean id="jbpmTxManager" class="org.springframework.orm.jpa.JpaTransactionManager">
+		<property name="entityManagerFactory" ref="entityManagerFactory" />
+	</bean>
+
+	<!--**************************************** -->
+	<!-- JBPM 6.1.0 Spring config starts here -->
+	<bean id="process" factory-method="newClassPathResource"
+		class="org.kie.internal.io.ResourceFactory">
+		<constructor-arg>
+			<value>travel.bpmn</value>
+		</constructor-arg>
+	</bean>
+	
+	<bean id="process2" factory-method="newClassPathResource"
+		class="org.kie.internal.io.ResourceFactory">
+		<constructor-arg>
+			<value>testtravelrequest.bpmn2</value>
+		</constructor-arg>
+	</bean>	
+
+	<bean id="runtimeEnvironment"
+		class="org.kie.spring.factorybeans.RuntimeEnvironmentFactoryBean">
+		<property name="type" value="DEFAULT" />
+		<property name="entityManagerFactory" ref="entityManagerFactory" />
+		<property name="transactionManager" ref="jbpmTxManager" />
+		<property name="assets">
+			<map>
+				<entry key-ref="process">
+					<util:constant static-field="org.kie.api.io.ResourceType.BPMN2" />
+				</entry>
+				<entry key-ref="process2">
+					<util:constant static-field="org.kie.api.io.ResourceType.BPMN2" />
+				</entry>
+			</map>
+		</property>
+	</bean>
+
+	<bean id="runtimeManager" class="org.kie.spring.factorybeans.RuntimeManagerFactoryBean"
+		destroy-method="close">
+		<property name="identifier" value="spring-rm" />
+		<property name="runtimeEnvironment" ref="runtimeEnvironment" />
+	</bean>
+
+	<bean id="logService" class="org.jbpm.process.audit.JPAAuditLogService">
+		<constructor-arg>
+			<ref bean="entityManagerFactory" />
+		</constructor-arg>
+		<constructor-arg>
+			<value>STANDALONE_LOCAL_SPRING_SHARED_EM</value>
+		</constructor-arg>
+	</bean>
+	<!-- JBPM 6.1.0 Spring config end here -->
+	<!--**************************************** -->
+
+	<!-- Singleton -->
+	<!-- bean id="jbpmResourceFiles" class="java.util.ArrayList">
+		<constructor-arg>
+			<list>
+				<value>travel.bpmn</value>
+				<value>travelrequest.bpmn2</value>
+				<value>testtravelrequest.bpmn2</value>
+			</list>
+		</constructor-arg>
+	</bean>
+
+	<bean id="runtimeManager"
+		class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+		<property name="targetClass" value="com.tg.ws.service.EnvironmentProvider" />
+		<property name="targetMethod" value="getRuntimeManager" />
+		<property name="arguments">
+			<list>
+				<ref bean="entityManagerFactory" />
+				<ref bean="jbpmTxManager" />
+				<ref bean="jbpmResourceFiles" />
+			</list>
+		</property>
+	</bean-->
+
+	<bean id="jbpmService" class="com.tg.ws.service.JBPMService" />
+
+	<tx:annotation-driven transaction-manager="jbpmTxManager" />
+
+	<sws:dynamic-wsdl id="studentDetails" portTypeName="StudentDetails"
+		locationUri="http://localhost:8080/qapprover" requestSuffix="Request"
+		responseSuffix="Response" targetNamespace="http://tg.com/ws-project">
+
+		<sws:xsd location="WEB-INF/ws-project.xsd" />
+	</sws:dynamic-wsdl>
+
+	<bean id="marshallingPayloadMethodProcessor"
+		class="org.springframework.ws.server.endpoint.adapter.method.MarshallingPayloadMethodProcessor">
+		<constructor-arg ref="marshaller" />
+		<constructor-arg ref="marshaller" />
+	</bean>
+
+	<!-- bean class="org.springframework.ws.server.endpoint.adapter.GenericMarshallingMethodEndpointAdapter"> 
+		<constructor-arg ref="marshaller"/> </bean -->
+
+
+	<bean id="defaultMethodEndpointAdapter"
+		class="org.springframework.ws.server.endpoint.adapter.DefaultMethodEndpointAdapter">
+		<property name="methodArgumentResolvers">
+			<list>
+				<ref bean="marshallingPayloadMethodProcessor" />
+			</list>
+		</property>
+		<property name="methodReturnValueHandlers">
+			<list>
+				<ref bean="marshallingPayloadMethodProcessor" />
+			</list>
+		</property>
+	</bean>
+
+
+	<bean
+		class="org.springframework.ws.server.endpoint.mapping.PayloadRootAnnotationMethodEndpointMapping">
+	</bean>
+
+	<bean id="marshaller" class="org.springframework.oxm.jaxb.Jaxb2Marshaller">
+		<property name="contextPath" value="com.tg.ws" />
+	</bean>
+</beans>

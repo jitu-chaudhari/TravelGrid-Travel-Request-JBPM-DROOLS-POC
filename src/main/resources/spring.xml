@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:jee="http://www.springframework.org/schema/jee" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+       	http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context-3.0.xsd
+		http://www.springframework.org/schema/jee 
+		http://www.springframework.org/schema/jee/spring-jee-3.0.xsd
+        http://www.springframework.org/schema/tx 
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+
+	<context:annotation-config />
+
+	<bean id="dataSource1"
+		class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+
+		<property name="driverClassName" value="com.mysql.jdbc.Driver" />
+		<property name="url"
+			value="jdbc:mysql://localhost/b2c" />
+		<property name="username" value="root" />
+		<property name="password" value="root" />
+	</bean>
+
+	<bean id="dataSource2"
+		class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+
+		<property name="driverClassName" value="com.microsoft.sqlserver.jdbc.SQLServerDriver" />
+		<property name="url"
+			value="jdbc:sqlserver://localhost:1433;databaseName=JPA_TEST" />
+		<property name="username" value="sa" />
+		<property name="password" value="Test123#" />
+	</bean>
+	
+	<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+		<constructor-arg name="dataSource" ref="dataSource2" />
+	</bean>
+
+	<bean id="userGroupCallback" class="com.tg.ws.CustomUserGroupCallback">
+		<property name="jdbcTemplate" ref="jdbcTemplate" />
+	</bean>
+
+	<bean id="entityManagerFactory"
+		class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+		<property name="dataSource" ref="dataSource2" />
+		<property name="jpaVendorAdapter" ref="jpaAdapter" />
+		<property name="persistenceUnitName" value="qapprover" />
+	</bean>
+
+	<bean id="jpaAdapter"
+		class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter">
+		<property name="showSql" value="false" />
+		<property name="generateDdl" value="true" />
+		<!--  property name="databasePlatform" value="org.hibernate.dialect.MySQL5Dialect" /-->
+		<property name="databasePlatform" value="org.hibernate.dialect.SQLServer2005Dialect" />
+		
+	</bean>
+
+	<bean id="jbpmTxManager" class="org.springframework.orm.jpa.JpaTransactionManager">
+		<property name="entityManagerFactory" ref="entityManagerFactory" />
+	</bean>
+	
+  <!-- bean id="btmConfig" factory-method="getConfiguration" class="bitronix.tm.TransactionManagerServices">
+  </bean>
+
+  <bean id="BitronixTransactionManager" factory-method="getTransactionManager"
+        class="bitronix.tm.TransactionManagerServices" depends-on="btmConfig" destroy-method="shutdown" /-->
+        	
+	<!-- bean id="jbpmTxManager" class="org.springframework.transaction.jta.JtaTransactionManager">
+		<property name="transactionManager" ref="BitronixTransactionManager" />
+	</bean-->	
+	
+
+	<!--**************************************** -->
+	<!-- JBPM 6.1.0 Spring config starts here -->
+	<bean id="jbpmResourceFiles" class="java.util.ArrayList">
+		<constructor-arg>
+			<list>
+				<value>travelrequest.bpmn2</value>
+				<value>travel.bpmn</value>
+				<value>tg.bpmn2</value>
+				<value>TravelGrid-Domestic-Travel-Reuqest.bpmn2</value>
+				<value>TravelGrid-Overseas-Travel-Reuqest.bpmn2</value>
+				<!--value>TicketTypeFareRule.xls</value-->
+				<value>TestDrools.xls</value>
+				<!-- value>ExpenseEligibilityRule.xls</value-->
+				<!--value>ERPMappingRule.xls</value-->
+			</list>
+		</constructor-arg>
+	</bean>	
+	
+	<bean id="userGroupCallbackImpl" class="com.tg.ws.CustomUserGroupCallback">
+		<constructor-arg name="jdbcTemplate" ref="jdbcTemplate" />
+	</bean>
+
+	<bean id="userInfo" class="com.tg.ws.CustomUserInfo">
+		<constructor-arg name="jdbcTemplate" ref="jdbcTemplate" />
+	</bean>
+
+	<bean id="jbpmEM" class="org.springframework.orm.jpa.support.SharedEntityManagerBean">
+		<property name="entityManagerFactory" ref="entityManagerFactory" />
+	</bean> 
+	
+	<bean id="taskService" class="org.kie.spring.factorybeans.TaskServiceFactoryBean"
+		destroy-method="close">
+		<property name="entityManagerFactory" ref="entityManagerFactory" />
+		<property name="transactionManager" ref="jbpmTxManager" />
+		<property name="listeners">
+			<list>
+				<bean class="org.jbpm.services.task.audit.JPATaskLifeCycleEventListener" />
+			</list>
+		</property>
+		<property name="userGroupCallback" ref="userGroupCallbackImpl" />
+		<!-- property name="userInfo" ref="userInfo"/ -->
+	</bean>
+
+	<bean id="jbpmAssets" class="org.springframework.beans.factory.config.MethodInvokingFactoryBean"> 
+		<property name="targetClass" value="com.tg.ws.service.EnvironmentProvider" /> 
+		<property name="targetMethod" value="getAssets" /> 
+		<property name="arguments"> 
+			<list> 
+				<ref bean="jbpmResourceFiles" /> 
+			</list> 
+		</property>
+	</bean>
+
+	<!-- bean id="runtimeManager" class="org.springframework.beans.factory.config.MethodInvokingFactoryBean"> 
+		<property name="targetClass" value="com.tg.ws.service.EnvironmentProvider" /> 
+		<property name="targetMethod" value="getRuntimeManager" /> 
+		<property name="arguments"> 
+			<list> 
+				<ref bean="entityManagerFactory" />
+				<ref bean="jbpmTxManager" />
+				<ref bean="jbpmResourceFiles" />
+				<ref bean="entityManager" /> 
+			</list> 
+		</property>
+	</bean-->
+
+	<bean id="ruleRuntimeEnvironment"
+		class="org.kie.spring.factorybeans.RuntimeEnvironmentFactoryBean">
+		<property name="type" value="DEFAULT" />
+		<property name="entityManagerFactory" ref="entityManagerFactory" />
+		<property name="entityManager" ref="jbpmEM"/>
+		<property name="transactionManager" ref="jbpmTxManager" />
+		<property name="assets" ref="jbpmAssets"/>
+	</bean>
+
+	<bean id="ruleRuntimeManager" class="org.kie.spring.factorybeans.RuntimeManagerFactoryBean"
+		destroy-method="close">
+		<property name="identifier" value="spring-rrm" />
+		<property name="runtimeEnvironment" ref="ruleRuntimeEnvironment" />
+		<property name="type" value="PER_PROCESS_INSTANCE" />
+		<qualifier value="ruleRM"/>
+	</bean>
+		
+	<bean id="runtimeEnvironment"
+		class="org.kie.spring.factorybeans.RuntimeEnvironmentFactoryBean">
+		<property name="type" value="DEFAULT" />
+		<property name="entityManagerFactory" ref="entityManagerFactory" />
+		<property name="transactionManager" ref="jbpmTxManager" />
+		<property name="assets" ref="jbpmAssets"/>
+		<property name="taskService" ref="taskService" />
+	</bean>
+
+	<bean id="runtimeManager" class="org.kie.spring.factorybeans.RuntimeManagerFactoryBean"
+		destroy-method="close">
+		<property name="identifier" value="spring-rm" />
+		<property name="runtimeEnvironment" ref="runtimeEnvironment" />
+		<qualifier value="rm"/>
+	</bean>
+
+
+	
+
+	<bean id="logService" class="org.jbpm.process.audit.JPAAuditLogService">
+		<constructor-arg>
+			<ref bean="entityManagerFactory" />
+		</constructor-arg>
+		<constructor-arg>
+			<value>STANDALONE_LOCAL_SPRING_SHARED_EM</value>
+		</constructor-arg>
+	</bean>
+	<!-- JBPM 6.1.0 Spring config end here -->
+	<!--**************************************** -->
+
+	<!-- Singleton -->
+	<!-- bean id="jbpmResourceFiles" class="java.util.ArrayList"> <constructor-arg> 
+		<list> <value>travel.bpmn</value> <value>travelrequest.bpmn2</value> <value>testtravelrequest.bpmn2</value> 
+		</list> </constructor-arg> </bean> <bean id="runtimeManager" class="org.springframework.beans.factory.config.MethodInvokingFactoryBean"> 
+		<property name="targetClass" value="com.tg.ws.service.EnvironmentProvider" 
+		/> <property name="targetMethod" value="getRuntimeManager" /> <property name="arguments"> 
+		<list> <ref bean="entityManagerFactory" /> <ref bean="jbpmTxManager" /> <ref 
+		bean="jbpmResourceFiles" /> </list> </property> </bean -->
+
+	<bean id="jbpmService" class="com.tg.ws.service.JBPMService" />
+
+	<tx:annotation-driven transaction-manager="jbpmTxManager" />
+</beans>
