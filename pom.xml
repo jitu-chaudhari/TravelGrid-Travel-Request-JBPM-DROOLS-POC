@@ -10,7 +10,7 @@
 	<url>http://www.springframework.org/spring-ws</url>
 
 	<properties>
-		<spring.version>3.1.1.RELEASE</spring.version>
+		<spring.version>5.3.18</spring.version>
 		<jbpm.version>6.1.0.Final</jbpm.version>
 		<drools.version>6.1.0.Final</drools.version>
 		<kie.version>6.1.0.Final</kie.version>
